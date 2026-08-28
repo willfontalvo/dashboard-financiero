@@ -42,44 +42,74 @@
 </head>
 <body class="min-h-screen p-6 md:p-10">
 
-  <div class="max-w-6xl mx-auto card-cuenta rounded-3xl p-6 md:p-10">
+    <div class="max-w-md card-cuenta rounded-3xl p-6 overflow-hidden">
 
-      <!-- Encabezado -->
-    <div class="relative flex items-center justify-between mb-8 h-16">
-      <!-- Línea de gráfico decorativa -->
-        <svg class="absolute left-0 w-full z-0" viewBox="0 0 1000 220" preserveAspectRatio="none" style="overflow: visible; top: 10px; height: 220px;">
-             <path d="M0,150 Q250,170 500,110 T1000,8"
-              fill="none" stroke="url(#gradLinea)" stroke-width="1.5" opacity="0.55"/>
-             <circle cx="1000" cy="8" r="4" fill="var(--gold-light)"/>
-        <defs>
-          <linearGradient id="gradLinea" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="var(--gold-dim)"/>
-            <stop offset="100%" stop-color="var(--gold-light)"/>
-            </linearGradient>
-        </defs>
-      </svg>
+     <!-- Encabezado + Saldo total (con línea de fondo) -->
+    <div class="relative mb-8">
 
-      <div class="relative z-10 flex items-center gap-4">
-        <div class="icon-square w-14 h-14 rounded-2xl flex items-center justify-center p-2.5" style="background-color: var(--bg);">
-          <img src="https://cdn.jsdelivr.net/gh/willfontalvo/dashboard-financiero@main/assets/icons/banco.png" class="w-full h-full object-contain" alt="Banco">
+      <img src="https://cdn.jsdelivr.net/gh/willfontalvo/dashboard-financiero@main/assets/icons/linea-grafico.png"
+           class="absolute object-contain z-0 pointer-events-none"
+           style="opacity: 0.6; top: 0px; bottom: -10px; right: -24px; width: 100%; object-position: right bottom;"
+           alt="Tendencia">
+
+      <div class="relative z-10">
+        <div class="flex items-center justify-between mb-6">
+          <div class="flex items-center gap-3">
+            <img src="https://cdn.jsdelivr.net/gh/willfontalvo/dashboard-financiero@main/assets/icons/banco.png" class="w-12 h-12 object-contain" alt="Banco">
+            <h1 class="font-display text-2xl font-semibold text-white">Cuentas bancarias</h1>
+          </div>
+          <img src="https://cdn.jsdelivr.net/gh/willfontalvo/dashboard-financiero@main/assets/icons/crecimiento.png" class="w-16 h-16 object-contain shrink-0" alt="Tendencia">
         </div>
-        <h1 class="font-display text-3xl md:text-4xl font-semibold text-white" style="background-color: var(--bg);">Cuentas bancarias</h1>
+
+        <p class="uppercase tracking-widest text-xs mb-1" style="color: var(--gold);">Saldo total</p>
+        <p id="saldoTotal" class="font-display text-5xl font-bold glow-text" style="color: var(--gold-light);">$ 0</p>
       </div>
-      <div class="icon-circle relative z-10 w-16 h-16 rounded-full flex items-center justify-center p-3 shrink-0">
-        <img src="https://cdn.jsdelivr.net/gh/willfontalvo/dashboard-financiero@main/assets/icons/crecimiento.png" class="w-full h-full object-contain" alt="Tendencia">
-      </div>
+
     </div>
 
-    <!-- Saldo total -->
-    <p class="uppercase tracking-widest text-sm mb-1" style="color: var(--gold);">Saldo total</p>
-    <p id="saldoTotal" class="font-display text-6xl md:text-7xl font-bold glow-text" style="color: var(--gold-light);">$ 0</p>
-
-    <div class="divider-gold my-8"></div>
-
-    <!-- Grid de cuentas -->
-    <div id="gridCuentas" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"></div>
+    <div class="divider-gold my-6"></div>
+    <!-- Grid de cuentas: 2 columnas -->
+    <div id="gridCuentas" class="grid grid-cols-2 gap-4"></div>
 
   </div>
 
 <script>
-  // Datos de ejemplo — luego esto vendrá de tu Google Sheet real
+  const cuentas = [
+    { nombre: "Efectivo",      icono: "efectivo.png",    conCirculo: true,  saldo: 350000 },
+    { nombre: "Bancolombia W", icono: "bancolombia.png", conCirculo: false, saldo: 1890000 },
+    { nombre: "Bancolombia N", icono: "bancolombia.png", conCirculo: false, saldo: 745000 },
+    { nombre: "Nequi W",       icono: "nequi.png",       conCirculo: false, saldo: 245000 },
+    { nombre: "Nequi N",       icono: "nequi.png",       conCirculo: false, saldo: 428000 },
+    { nombre: "Daviplata N",   icono: "banco.png",       conCirculo: false, saldo: 112000 },
+    { nombre: "Falabella",     icono: "falabella.png",   conCirculo: false, saldo: 980000 },
+  ];
+
+  const formatoPesos = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+  const grid = document.getElementById('gridCuentas');
+  let total = 0;
+
+  cuentas.forEach(c => {
+    total += c.saldo;
+    const icono = c.conCirculo
+      ? `<div class="icon-circle w-11 h-11 rounded-full flex items-center justify-center p-2">
+           <img src="https://cdn.jsdelivr.net/gh/willfontalvo/dashboard-financiero@main/assets/icons/${c.icono}" class="w-full h-full object-contain" alt="${c.nombre}">
+         </div>`
+      : `<img src="https://cdn.jsdelivr.net/gh/willfontalvo/dashboard-financiero@main/assets/icons/${c.icono}" class="w-11 h-11 object-contain" alt="${c.nombre}">`;
+
+    grid.innerHTML += `
+      <div class="card-cuenta rounded-2xl p-4 flex flex-col">
+        <div class="flex items-start justify-between mb-3">
+          ${icono}
+          <button class="text-lg" style="color: var(--text-dim);">&#8942;</button>
+        </div>
+        <p class="font-semibold text-white text-sm">${c.nombre}</p>
+        <div class="divider-gold my-2"></div>
+        <p class="font-display text-xl font-bold" style="color: var(--gold-light);">${formatoPesos.format(c.saldo)}</p>
+      </div>`;
+  });
+
+  document.getElementById('saldoTotal').textContent = formatoPesos.format(total);
+</script>
+
+</body>
+</html>
