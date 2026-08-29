@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <base target="_top">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Mi Finanzas</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- ApexCharts -->
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+  <!-- Fuentes -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <style>
+    :root {
+      --bg: #0a0908;
+      --card: #16130f;
+      --card-border: #2b2419;
+
+      --gold: #d4af37;
+      --gold-light: #f0d078;
+      --gold-dim: #8a6d1f;
+
+      --text: #f5f0e6;
+      --text-dim: #9b9284;
+
+      --verde: #4caf50;
+      --rojo: #e05c5c;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .font-number {
+      font-family: 'Manrope', sans-serif;
+    }
+  </style>
+</head>
+
+<body>
+
+  <main>
+    <h1 style="padding:30px; color:#d4af37;">
+      Dashboard Financiero
+    </h1>
+  </main>
+<?!= include('Formulario'); ?>
+<?!= include('FormularioJS'); ?>
+</body>
+
+</html>

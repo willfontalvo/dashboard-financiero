@@ -1,0 +1,16 @@
+# Configuración local de clasp
+.clasp.json
+
+# Archivos de prueba
+preview-*.html
+
+# Dependencias
+node_modules/
+
+# Archivos temporales
+*.log
+.DS_Store
+Thumbs.db
+
+# Configuración local de VS Code
+.vscode/

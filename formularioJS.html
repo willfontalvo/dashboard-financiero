@@ -1,0 +1,467 @@
+<script>
+const FormularioApp = (() => {
+  let arbolLogico = {};
+  let modoActual = 'INGRESOS';
+  let listo = false;
+
+  const $ = (id) => document.getElementById(id);
+  const formatoPesosFormulario = new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    maximumFractionDigits: 0
+  });
+
+  function fechaLocal() {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  }
+
+  function llenarSelect(select, items = [], placeholder = 'Seleccione...') {
+    if (!select) return;
+    select.innerHTML = '';
+    select.add(new Option(placeholder, ''));
+    items.filter(Boolean).forEach(item => select.add(new Option(item, item)));
+  }
+
+  function setHidden(id, hidden) {
+    const el = $(id);
+    if (el) el.classList.toggle('hidden', hidden);
+  }
+
+  function setRequired(id, value) {
+    const el = $(id);
+    if (el) el.required = value;
+  }
+
+  function mostrarToast(texto, error = false) {
+    const toast = $('toast');
+    if (!toast) return;
+    toast.textContent = texto;
+    toast.style.borderColor = error ? '#ef5447' : 'var(--gold-dim)';
+    toast.style.color = error ? '#ef7569' : 'var(--gold-light)';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2400);
+  }
+
+  function limpiarConceptos() {
+    if ($('campoConceptoLista')) $('campoConceptoLista').innerHTML = '';
+    if ($('campoConceptoTexto')) $('campoConceptoTexto').value = '';
+    setHidden('fieldConceptoLista', true);
+    setHidden('fieldConceptoTexto', false);
+    setRequired('campoConceptoLista', false);
+    setRequired('campoConceptoTexto', false);
+  }
+
+  function cargarDesplegables() {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      console.warn('FormularioApp: google.script.run solo funciona dentro de Google Apps Script.');
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler((estructura) => {
+        arbolLogico = estructura || {};
+
+        llenarSelect($('campoCuenta'), arbolLogico.CUENTAS || [], 'Selecciona una cuenta');
+        llenarSelect($('campoCuentaDestino'), arbolLogico.CUENTAS || [], 'Selecciona cuenta destino');
+
+        const viviendas = ['N/A', ...(arbolLogico.VIVIENDAS || []).filter(v => v !== 'N/A')];
+        if ($('campoVivienda')) {
+          $('campoVivienda').innerHTML = '';
+          [...new Set(viviendas)].forEach(v => $('campoVivienda').add(new Option(v, v)));
+        }
+
+        seleccionarModo('INGRESOS');
+        listo = true;
+      })
+      .withFailureHandler((error) => {
+        mostrarToast('No se pudieron cargar los desplegables.', true);
+        console.error(error);
+      })
+      .obtenerEstructuraDesplegables();
+  }
+
+  function seleccionarModo(modo) {
+    modoActual = modo;
+
+    document.querySelectorAll('.type-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === modo);
+    });
+
+    setHidden('fieldCuenta', false);
+    setHidden('fieldCuentaDestino', true);
+    setHidden('fieldVivienda', false);
+    setHidden('fieldCategoria', false);
+    limpiarConceptos();
+
+    setRequired('campoCuenta', true);
+    setRequired('campoCuentaDestino', false);
+    setRequired('campoCategoria', true);
+
+    if ($('campoCategoria')) $('campoCategoria').innerHTML = '';
+
+    if (modo === 'INGRESOS') {
+      llenarSelect(
+        $('campoCategoria'),
+        arbolLogico.INGRESOS?.categorias || [],
+        'Selecciona una categoría'
+      );
+      if ($('campoConceptoTexto')) {
+        $('campoConceptoTexto').placeholder = 'Ej: Pago de nómina, venta...';
+        $('campoConceptoTexto').required = true;
+      }
+    }
+
+    if (modo === 'AHORRO') {
+      llenarSelect(
+        $('campoCategoria'),
+        arbolLogico['AHORROS E INVERSIONES']?.categorias || [],
+        'Selecciona ahorro o inversión'
+      );
+      if ($('campoConceptoTexto')) {
+        $('campoConceptoTexto').placeholder = 'Describe el movimiento...';
+      }
+    }
+
+    if (modo === 'FIJOS') {
+      llenarSelect(
+        $('campoCategoria'),
+        arbolLogico.GASTOS?.conceptosPorCategoria?.FIJOS || [],
+        'Selecciona gasto fijo'
+      );
+      if ($('campoConceptoTexto')) {
+        $('campoConceptoTexto').placeholder = 'Describe el gasto fijo...';
+        $('campoConceptoTexto').required = true;
+      }
+    }
+
+    if (modo === 'VARIABLES') {
+      const variables = (arbolLogico.GASTOS?.conceptosPorCategoria?.VARIABLES || [])
+        .filter(cat => String(cat).toUpperCase() !== 'DEUDA');
+
+      llenarSelect($('campoCategoria'), variables, 'Selecciona gasto variable');
+      if ($('campoConceptoTexto')) {
+        $('campoConceptoTexto').placeholder = 'Describe el gasto variable...';
+        $('campoConceptoTexto').required = true;
+      }
+    }
+
+    if (modo === 'DEUDA') {
+      setHidden('fieldCategoria', true);
+      setHidden('fieldConceptoTexto', true);
+      setHidden('fieldConceptoLista', false);
+
+      if ($('campoCategoria')) {
+        $('campoCategoria').innerHTML = '<option value="DEUDA" selected>DEUDA</option>';
+      }
+
+      llenarSelect(
+        $('campoConceptoLista'),
+        arbolLogico.GASTOS?.subConceptos?.DEUDA || [],
+        'Selecciona una deuda'
+      );
+
+      setRequired('campoCategoria', false);
+      setRequired('campoConceptoLista', true);
+      setRequired('campoConceptoTexto', false);
+    }
+
+    if (modo === 'TRASLADO') {
+      setHidden('fieldCategoria', true);
+      setHidden('fieldConceptoLista', true);
+      setHidden('fieldConceptoTexto', true);
+      setHidden('fieldVivienda', true);
+      setHidden('fieldCuentaDestino', false);
+
+      if ($('campoCategoria')) {
+        $('campoCategoria').innerHTML = '<option value="TRASLADO" selected>TRASLADO</option>';
+      }
+
+      setRequired('campoCategoria', false);
+      setRequired('campoConceptoLista', false);
+      setRequired('campoConceptoTexto', false);
+      setRequired('campoCuentaDestino', true);
+    }
+
+    actualizarPreview();
+  }
+
+  function procesarCategoria() {
+    const categoria = $('campoCategoria')?.value || '';
+
+    limpiarConceptos();
+    if (!categoria) {
+      actualizarPreview();
+      return;
+    }
+
+    const categoriaNormalizada = categoria.toUpperCase();
+
+    if (modoActual === 'FIJOS' && categoriaNormalizada === 'SERVICIOS PUBLICOS') {
+      setHidden('fieldConceptoTexto', true);
+      setHidden('fieldConceptoLista', false);
+      setRequired('campoConceptoLista', true);
+
+      llenarSelect(
+        $('campoConceptoLista'),
+        arbolLogico.GASTOS?.subConceptos?.['SERVICIOS PUBLICOS'] || [],
+        'Selecciona servicio'
+      );
+    }
+    else if (modoActual === 'AHORRO') {
+      const lista = arbolLogico['AHORROS E INVERSIONES']?.conceptosPorCategoria?.[categoria] || [];
+
+      if (lista.length) {
+        setHidden('fieldConceptoTexto', true);
+        setHidden('fieldConceptoLista', false);
+        setRequired('campoConceptoLista', true);
+        llenarSelect($('campoConceptoLista'), lista, 'Selecciona destino');
+      } else {
+        setRequired('campoConceptoTexto', true);
+      }
+    }
+    else {
+      setRequired('campoConceptoTexto', true);
+    }
+
+    actualizarPreview();
+  }
+
+  function formatearMonto() {
+    const visual = $('campoMontoVisual');
+    const hidden = $('campoMonto');
+    if (!visual || !hidden) return;
+
+    const numero = visual.value.replace(/\D/g, '');
+    hidden.value = numero;
+    visual.value = numero ? formatoPesosFormulario.format(Number(numero)) : '';
+    actualizarPreview();
+  }
+
+  function nombreModo() {
+    return ({
+      INGRESOS: 'Ingreso',
+      AHORRO: 'Ahorro / inversión',
+      DEUDA: 'Deuda',
+      FIJOS: 'Gasto fijo',
+      VARIABLES: 'Gasto variable',
+      TRASLADO: 'Traslado'
+    })[modoActual] || modoActual;
+  }
+
+  function conceptoActual() {
+    if (modoActual === 'TRASLADO') {
+      return $('campoCuentaDestino')?.value
+        ? 'Transferencia a ' + $('campoCuentaDestino').value
+        : '—';
+    }
+
+    if ($('fieldConceptoLista') && !$('fieldConceptoLista').classList.contains('hidden')) {
+      return $('campoConceptoLista')?.value || '—';
+    }
+
+    return $('campoConceptoTexto')?.value || '—';
+  }
+
+  function actualizarPreview() {
+    if ($('previewTipo')) $('previewTipo').textContent = nombreModo();
+    if ($('previewFecha')) $('previewFecha').textContent = $('campoFecha')?.value || '—';
+
+    if ($('previewCategoria')) {
+      $('previewCategoria').textContent =
+        modoActual === 'DEUDA' ? 'DEUDA' :
+        modoActual === 'TRASLADO' ? 'TRASLADO' :
+        ($('campoCategoria')?.value || '—');
+    }
+
+    if ($('previewConcepto')) $('previewConcepto').textContent = conceptoActual();
+    if ($('previewCuenta')) $('previewCuenta').textContent = $('campoCuenta')?.value || '—';
+    if ($('previewMonto')) $('previewMonto').textContent = $('campoMontoVisual')?.value || '$ 0';
+  }
+
+  function construirDatos() {
+    const tipoBackend = {
+      INGRESOS: 'INGRESOS',
+      AHORRO: 'AHORROS E INVERSIONES',
+      DEUDA: 'GASTOS',
+      FIJOS: 'GASTOS',
+      VARIABLES: 'GASTOS',
+      TRASLADO: 'TRASLADO'
+    }[modoActual];
+
+    let categoria = $('campoCategoria')?.value || '';
+    let concepto = conceptoActual();
+    let vivienda = $('campoVivienda')?.value || 'N/A';
+    const cuenta = $('campoCuenta')?.value || '';
+
+    if (modoActual === 'DEUDA') {
+      categoria = 'DEUDA';
+    }
+
+    if (modoActual === 'TRASLADO') {
+      const destino = $('campoCuentaDestino')?.value || '';
+
+      if (cuenta === destino) {
+        throw new Error('La cuenta de origen y destino no pueden ser la misma.');
+      }
+
+      categoria = 'TRASLADO';
+      concepto = 'Transferencia a ' + destino;
+      vivienda = 'N/A';
+    }
+
+    return {
+      fecha: $('campoFecha')?.value || '',
+      tipo: tipoBackend,
+      categoria,
+      concepto: concepto === '—' ? '' : concepto,
+      vivienda,
+      cuenta,
+      monto: $('campoMonto')?.value || ''
+    };
+  }
+
+  function validarDatos(datos) {
+    if (!datos.fecha) return 'Selecciona una fecha.';
+    if (!datos.tipo) return 'Selecciona un tipo de movimiento.';
+    if (!datos.categoria) return 'Selecciona una categoría.';
+    if (!datos.cuenta) return 'Selecciona una cuenta.';
+    if (!datos.monto || Number(datos.monto) <= 0) return 'Ingresa un monto válido.';
+
+    if (modoActual === 'TRASLADO' && !$('campoCuentaDestino')?.value) {
+      return 'Selecciona la cuenta destino.';
+    }
+
+    if (modoActual === 'DEUDA' && !$('campoConceptoLista')?.value) {
+      return 'Selecciona la deuda.';
+    }
+
+    if (modoActual === 'FIJOS' && $('campoCategoria')?.value === 'SERVICIOS PUBLICOS' && !$('campoConceptoLista')?.value) {
+      return 'Selecciona el servicio público.';
+    }
+
+    return '';
+  }
+
+  function guardar(event) {
+    event.preventDefault();
+
+    if (!listo) {
+      mostrarToast('Espera a que carguen los desplegables.', true);
+      return;
+    }
+
+    let datos;
+    try {
+      datos = construirDatos();
+    } catch (error) {
+      mostrarToast(error.message, true);
+      return;
+    }
+
+    const errorValidacion = validarDatos(datos);
+    if (errorValidacion) {
+      mostrarToast(errorValidacion, true);
+      return;
+    }
+
+    const btn = document.querySelector('.btn-primary[form="registroForm"]');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+    }
+
+    google.script.run
+      .withSuccessHandler((mensaje) => {
+        mostrarToast(mensaje || 'Transacción registrada con éxito');
+        resetearFormulario();
+
+        if (typeof window.actualizarDashboardCompleto === 'function') {
+          window.actualizarDashboardCompleto();
+        } else if (typeof window.cargarResumen === 'function') {
+          window.cargarResumen();
+        }
+
+        setTimeout(cerrar, 450);
+
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Guardar registro';
+        }
+      })
+      .withFailureHandler((error) => {
+        console.error(error);
+        mostrarToast(error?.message || 'Error al guardar el registro.', true);
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Guardar registro';
+        }
+      })
+      .registrarTransaccion(datos);
+  }
+
+  function resetearFormulario() {
+    $('registroForm')?.reset();
+    if ($('campoFecha')) $('campoFecha').value = fechaLocal();
+    if ($('campoMonto')) $('campoMonto').value = '';
+    seleccionarModo('INGRESOS');
+  }
+
+  function abrir() {
+    $('modalOverlay')?.classList.add('active');
+  }
+
+  function cerrar() {
+    $('modalOverlay')?.classList.remove('active');
+  }
+
+  function init() {
+    if (!$('registroForm')) return;
+
+    if ($('campoFecha')) $('campoFecha').value = fechaLocal();
+
+    document.querySelectorAll('.type-tab').forEach(btn => {
+      btn.addEventListener('click', () => seleccionarModo(btn.dataset.mode));
+    });
+
+    $('campoCategoria')?.addEventListener('change', procesarCategoria);
+    $('campoMontoVisual')?.addEventListener('input', formatearMonto);
+
+    [
+      'campoFecha',
+      'campoCuenta',
+      'campoCategoria',
+      'campoConceptoLista',
+      'campoConceptoTexto',
+      'campoVivienda',
+      'campoCuentaDestino'
+    ].forEach(id => {
+      $(id)?.addEventListener('input', actualizarPreview);
+      $(id)?.addEventListener('change', actualizarPreview);
+    });
+
+    $('registroForm').addEventListener('submit', guardar);
+    $('closeModal')?.addEventListener('click', cerrar);
+    $('cancelBtn')?.addEventListener('click', cerrar);
+    $('openModal')?.addEventListener('click', abrir);
+
+    $('modalOverlay')?.addEventListener('click', (e) => {
+      if (e.target === $('modalOverlay')) cerrar();
+    });
+
+    cargarDesplegables();
+    actualizarPreview();
+  }
+
+  return {
+    init,
+    abrir,
+    cerrar,
+    seleccionarModo,
+    cargarDesplegables
+  };
+})();
+
+document.addEventListener('DOMContentLoaded', FormularioApp.init);
+</script>
